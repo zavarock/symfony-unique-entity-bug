@@ -11,6 +11,7 @@
 
 namespace App\DataFixtures;
 
+use App\Entity\Bug;
 use App\Entity\Comment;
 use App\Entity\Post;
 use App\Entity\Tag;
@@ -26,8 +27,9 @@ final class AppFixtures extends Fixture
 {
     public function __construct(
         private readonly UserPasswordHasherInterface $passwordHasher,
-        private readonly SluggerInterface $slugger
-    ) {
+        private readonly SluggerInterface            $slugger
+    )
+    {
     }
 
     public function load(ObjectManager $manager): void
@@ -35,6 +37,7 @@ final class AppFixtures extends Fixture
         $this->loadUsers($manager);
         $this->loadTags($manager);
         $this->loadPosts($manager);
+        $this->loadBugs($manager);
     }
 
     private function loadUsers(ObjectManager $manager): void
@@ -60,7 +63,7 @@ final class AppFixtures extends Fixture
             $tag = new Tag($name);
 
             $manager->persist($tag);
-            $this->addReference('tag-'.$name, $tag);
+            $this->addReference('tag-' . $name, $tag);
         }
 
         $manager->flush();
@@ -79,18 +82,29 @@ final class AppFixtures extends Fixture
             $post->addTag(...$tags);
 
             foreach (range(1, 5) as $i) {
-                /** @var User $commentAuthor */
-                $commentAuthor = $this->getReference('john_user');
+                $commentAuthor = $this->getReference('john_user', User::class);
 
                 $comment = new Comment();
                 $comment->setAuthor($commentAuthor);
                 $comment->setContent($this->getRandomText(random_int(255, 512)));
-                $comment->setPublishedAt(new \DateTimeImmutable('now + '.$i.'seconds'));
+                $comment->setPublishedAt(new \DateTimeImmutable('now + ' . $i . 'seconds'));
 
                 $post->addComment($comment);
             }
 
             $manager->persist($post);
+        }
+
+        $manager->flush();
+    }
+
+    private function loadBugs(ObjectManager $manager): void
+    {
+        foreach (range(1, 3) as $i) {
+            $bug = new Bug();
+            $bug->setLabel($i);
+
+            $manager->persist($bug);
         }
 
         $manager->flush();
@@ -128,9 +142,9 @@ final class AppFixtures extends Fixture
     }
 
     /**
+     * @return array<int, array{0: string, 1: AbstractUnicodeString, 2: string, 3: string, 4: \DateTimeImmutable, 5: User, 6: array<Tag>}>
      * @throws \Exception
      *
-     * @return array<int, array{0: string, 1: AbstractUnicodeString, 2: string, 3: string, 4: \DateTimeImmutable, 5: User, 6: array<Tag>}>
      */
     private function getPostData(): array
     {
@@ -139,15 +153,14 @@ final class AppFixtures extends Fixture
         foreach ($this->getPhrases() as $i => $title) {
             // $postData = [$title, $slug, $summary, $content, $publishedAt, $author, $tags, $comments];
 
-            /** @var User $user */
-            $user = $this->getReference(['jane_admin', 'tom_admin'][0 === $i ? 0 : random_int(0, 1)]);
+            $user = $this->getReference(['jane_admin', 'tom_admin'][0 === $i ? 0 : random_int(0, 1)], User::class);
 
             $posts[] = [
                 $title,
                 $this->slugger->slug($title)->lower(),
                 $this->getRandomText(),
                 $this->getPostContent(),
-                (new \DateTimeImmutable('now - '.$i.'days'))->setTime(random_int(8, 17), random_int(7, 49), random_int(0, 59)),
+                (new \DateTimeImmutable('now - ' . $i . 'days'))->setTime(random_int(8, 17), random_int(7, 49), random_int(0, 59)),
                 // Ensure that the first post is written by Jane Doe to simplify tests
                 $user,
                 $this->getRandomTags(),
@@ -250,9 +263,9 @@ final class AppFixtures extends Fixture
     }
 
     /**
+     * @return array<Tag>
      * @throws \Exception
      *
-     * @return array<Tag>
      */
     private function getRandomTags(): array
     {
@@ -261,10 +274,7 @@ final class AppFixtures extends Fixture
         $selectedTags = \array_slice($tagNames, 0, random_int(2, 4));
 
         return array_map(function ($tagName) {
-            /** @var Tag $tag */
-            $tag = $this->getReference('tag-'.$tagName);
-
-            return $tag;
+            return $this->getReference('tag-' . $tagName, Tag::class);
         }, $selectedTags);
     }
 }
